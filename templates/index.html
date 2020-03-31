@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>CIS Ops Challenge - Train and Predict </title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link rel="shortcut icon" href="/static/images/android-icon-128x128.png">
+
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+<link rel="stylesheet" href="/static/stylesheets/main.css">
+<link rel="stylesheet" href="/static/stylesheets/style.css">
+
+<style>
+    .pagelink {
+        font-size: 15px;
+        color: #CDD2D4;
+        line-height: 24px;
+        font-weight: 400;
+        text-decoration:  none;
+    }
+    .pagelink:hover {
+        font-size: 15px;
+        color: #CDD2D4;
+        line-height: 24px;
+        font-weight: 400;
+        text-decoration:  underline;
+    }
+    .pagelink:visited {
+        font-size: 15px;
+        color: #CDD2D4;
+        line-height: 24px;
+        font-weight: 400;
+        text-decoration:  none;
+    }
+    input[type="file"] {
+        display: none;
+    }
+    .custom-file-upload {
+        border: 1px solid #ccc;
+        display: inline-block;
+        padding: 0px 12px;
+        cursor: pointer;
+        border-radius: 3px;
+        height: 34px;
+        white-space: nowrap;
+    }
+    a {
+        color: #007bff;
+    }
+    a:hover {
+        color: #0056b3;
+        text-decoration: none;
+    }
+    a:visited{
+        color: #0056b3;
+    }
+    table{
+        font-size: 16px;
+    }
+    td {
+      padding: 0px 6px 2px 4px;
+      text-align: left;
+      border: solid 1px black;
+      font-weight: normal;
+    }
+    th{
+       padding: 0px 4px 2px 4px;
+       background-color: #242424;
+       color: white;
+       border: solid 1px #242424;
+    }
+</style>
+</head>
+<body>
+    <nav class="blog-header">
+       <div class="site-nav">
+          <div class="logo-container">
+             <a href="https://zero.nike.com"><img src="/static/images/swoosh.png"></a>
+             <div class="vertical-line"></div>
+             <a class="nispalizer navbar-button" href="/">CIS</a>
+          </div>
+          <ul id="menu">
+            <li><a class="pagelink" href="https://confluence.nike.com/display/CVM/CIS+-+Vulnerability+Management+Home" id="vm">CIS Attack Surface Management(ASM)</a></li>
+            <li><a class="pagelink" href="https://confluence.nike.com/display/CISPUBLIC/STM+Home" id="STM">CIS Security Tools Management(STM)</a></li>
+            <li><a class="pagelink" href="https://red.nike.com/" id="RED">Request Pen Test</a></li>
+            <li><a class="pagelink" href="https://confluence.nike.com/display/RISK/Information+Risk+Assessment+Request+Form" id="IRM">Request Risk Assessment</a></li>
+            <li><a class="pagelink" href="https://nisp.nike.com/dc" id="NISPDC">Classify Your Data</a></li>
+          </ul>
+          <div class="nav-buttons">
+ <!--             <button class="contact-intake navbar-button">Contact Support</button> -->
+              <a class="login navbar-button" href="/logout">Request Support</a>
+ <!--            <div class="search-img-container"><img class="search-img search-button" src="/static/images/search-icon-desktop.svg"></div> -->
+          </div>
+       </div>
+    </nav>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <p>
+            </p>
+            <h3>Welcome to the CIS Ops Challenge Vuln Management Classifier Project!</h3>
+            <p>
+                This project was built by a team of volunteers lead by Darrin McIntyre.  It's goal was to leverage data analysis to dramatically enhance confidence scoring for vulnerability information through enrichment and the application of a trained ML model. 
+            </p>
+        </div>
+    </div>
+	<div class="row">
+        <div class="col-6">
+            <h3>System Status (<a href="javascript:void(0);" onclick="getStatus();getOuput();">Refresh</a>)</h3>
+            <div style="font-weight: bold;float:left; padding-right:9px;">Status:  </div><div id="status"></div>
+            <div style="font-weight: bold;">Our ML Files:
+            <table id="files_table" style="cell-padding:">
+            <tr><th>File Name</th><th>Last Updated</th><th>Size (Bytes)</th><th>Current?</th></tr>
+            </table>
+            </div>
+            <p>&nbsp;</p>
+            <div style="font-weight: bold;">Our (Split) Output Files:
+            <table id="output_files_table" style="cell-padding:">
+            <tr><th>File Name</th><th>Last Updated</th><th>Size (Bytes)</th><th>Current?</th></tr>
+            </table>
+            </div>
+        </div>
+	   <div class="col-3">
+            <h3>Click-To-Run Tasks:</h3>
+            <ul>
+                <li><a href="javascript:void(0);" onclick="runProcess('/task/load')">Run Data Loader</a></li>
+                <li><a href="javascript:void(0);" onclick="runProcess('/task/map')">Run Data Enrichment (Mapper)</a></li>
+                <li><a href="javascript:void(0);" onclick="runProcess('/task/engineer')">Run Feature Engineering</a></li>
+                <li><a href="javascript:void(0);" onclick="runProcess('/task/predict')">Run Predictions</a></li>
+                <li><a href="javascript:void(0);" onclick="runProcess('/task/split')">Run Results Splitter</a></li>
+                <li><a href="javascript:void(0);" onclick="runProcess('/task/learn')">Run Learning</a></li>
+                <li><a href="javascript:void(0);" onclick="document.getElementById('upload_form').style.display='block'">Upload Learning Data</a>
+                <form id="upload_form"  enctype="multipart/form-data" style="display:none">
+                    <BR />
+                    <table style="border:none">
+                        <tr >
+                            <td style="border:none" valign="middle" s><input id="file_input" type="file" onchange="setFileName()"/><span style="font-size: 18px;white-space: nowrap;">File To Upload:</span></td>
+                            <td style="border:none" valign="middle"><span id="selected_file" style="width:200px;font-size: 18px;white-space: nowrap;">[none selected]</span></td>
+                            <td style="border:none" valign="middle">
+                            <label for="file_input" class="custom-file-upload">
+                            <i class="fa fa-cloud-upload"></i> Select File
+                            </label>
+                            </td >
+                        </tr>
+                        <tr><td  style="border:none" colspan=3><a class="btn-success navbar-button" style="padding:6px 12px" onclick="postFile()" href="javascript:void(0);">Upload File</a></td></tr>
+                </table>
+                </form> </li>
+            </ul>
+        </div>
+        <div class="col-3">
+            <div id="task_results" style="display:none">
+                <h3>Result of Task Call:</h3>
+                <span style="font-weight: bold;">State: </span><span id="task_state"></span><br>
+                <span style="font-weight: bold;">Needs to be run: </span><span id="task_runnable"></span><br>
+                <span style="font-weight: bold;">Can be forcibly run: </span><span id="task_forcible"></span><br>
+                <span style="font-weight: bold;">Status: </span><span id="task_status"></span><br>
+                <div id="enable_force" style="display:none">
+                    <br />
+                    <br />
+                    <!-- <span style="font-weight: bold;">Force Refresh: </span> -->
+                    <a href="javascript:void(0);" class="btn-success navbar-button" style="padding:6px 12px"  onclick="force_refresh('')">Force Task to Start</a> <div id="refresh_url" style="display:none"></div> 
+                    <br>
+                </div>
+<!--                 <span style="font-weight: bold;">ML Task Output Files:</span><br>
+                <table id="task_files_table" >
+                <tr><th>File Name</th style='text-align: center;'><th>Last Updated</th><th style='text-align: right;'>Size (Bytes)</th><th style='text-align: center;'>Current?</th></tr>
+                </table> -->
+                
+            </div>
+        </div>
+	</div>
+    <div class="row">
+        <div class="col-12">
+            <p>&nbsp;</p>
+            <p>&nbsp;</p>
+            <p>&nbsp;</p>
+            <h3>About:</h3>
+                This project consists of 7 primary elements:
+                <ul>
+                    <li><span style="font-weight: bold;">Learning Engine</span>  - A solution that ingests data modified by ASM SMEs to provide guidance (training) the ML algorith. </li>
+                    <li><span style="font-weight: bold;">Predictor</spana>  - Custom built ML/AI solution capable of predicting accuracy of severity ratings to improve prioritization to the data set quickly and with a high degree of confidence. </li>
+                    <li><span style="font-weight: bold;">Feature Engineering</span>  - Custom code that remaps several dozen attributes recorded for each vulnerability and host into Machine Learning friendly bitwise features.</li>
+                    <li><span style="font-weight: bold;">Data Mapper</span>  - Custom code that's been optimized to execute parallelized mapping of data sets.  Capable of processing more than 20 Million records per hour on an AWS C4.8xLarge instance.</li>
+                    <li><span style="font-weight: bold;">Data Loader</span> - Custom code to retrieve data from a range of sources and persist to S3 as parquest, json, and csv.  Data sources can be readily expanded by adding new Data Shims.</li>
+                    <li><span style="font-weight: bold;">This Website</span> - Custom built website that leverages AJAX calls, backed by an API, that manages the solution triggers processing tasks, and provides access to files.</li>
+                    <li><span style="font-weight: bold;">AWS Infrastructure</span>  - Set of custom Cloud Formation scripts that can build, execute the process, and then destroy the underlying resources efficiently to allow for at-scale batch processing using compute sizes not available in containerized solutions</li>
+                    <li>Source Repo: <a href="https://github.nike.com/CIS/winning-team-gitops/tree/topic/flaskstuff"> https://github.nike.com/CIS/winning-team-gitops/tree/topic/flaskstuff</a></li>
+                </ul>
+
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+<script>
+    $(document).ready(function () {
+        console.log("Getting status");
+        getStatus();
+        setInterval(function(){ getStatus(); }, 15000);
+    });
+
+    function getStatus(){
+        $.getJSON({
+            url: "/api/status",
+            success: function (data) {
+                // Clear existing tables of listed files
+                var mlFiles = document.getElementById("files_table");
+                mlFiles.getElementsByTagName("tbody")[0].innerHTML = mlFiles.rows[0].innerHTML;
+
+                var outputFiles = document.getElementById("output_files_table");
+                outputFiles.getElementsByTagName("tbody")[0].innerHTML = outputFiles.rows[0].innerHTML;
+
+                // $("#state").html(data.state)
+                $("#status").html(data.status)
+                file_dictionary = sortOnKeys(JSON.parse(data.files))
+                for (var key in file_dictionary){
+                    var value = file_dictionary[key];
+                    if(key.includes("final_results_sev") ){
+                        var $tr = $('<tr>').append(
+                        $('<td>').html("<a href='/files/" + value.file_name + "'>" +  value.file_name + "</a>"),
+                        $("<td style='text-align: center;'>").text(value.file_date != "01/01/0001, 00:00:00" ? fdate(new Date(Date.parse(value.file_date))) : "--" ),
+                        $("<td style='text-align: right;'>").text(value.file_size > 0 ? readableBytes(value.file_size) : "0 B"),
+                        $("<td style='text-align: center;'>").text(value.needs_refreshed ? "No" : "Yes")
+                        ).appendTo('#output_files_table');
+                    } else if (!key.endsWith(".p")) {
+                        var $tr = $('<tr>').append(
+                        $('<td>').html("<a href='/files/" + value.file_name + "'>" +  value.file_name + "</a>"),
+                        $("<td style='text-align: center;'>").text(value.file_date != "01/01/0001, 00:00:00" ? fdate(new Date(Date.parse(value.file_date))) : "--" ),
+                        $("<td style='text-align: right;'>").text(value.file_size > 0 ? readableBytes(value.file_size) : "0 B"),
+                        $("<td style='text-align: center;'>").text(value.needs_refreshed ? "No" : "Yes")
+                        ).appendTo('#files_table');
+                    }
+                }
+            }
+        });
+    }
+    function sortOnKeys(dict) {
+        var sorted = [];
+        for(var key in dict) {
+            sorted[sorted.length] = key;
+        }
+        sorted.sort();
+        sorted.reverse();
+
+        var tempDict = {};
+        for(var i = 0; i < sorted.length; i++) {
+            tempDict[sorted[i]] = dict[sorted[i]];
+        }
+
+        return tempDict;
+    }
+
+    function fdate(current_datetime){
+        const months = ["JAN", "FEB", "MAR","APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        var isAM = current_datetime.getHours() < 12
+        if (current_datetime.getHours() > 12)
+            hours = (current_datetime.getHours() - 12).toString().padStart("2","0")
+        else if(current_datetime.getHours() == 0)
+            hours = "12"
+        else
+            hours = current_datetime.getHours().toString().padStart("2","0")
+        
+        formatted_date = months[current_datetime.getMonth()] + " "+ current_datetime.getDate().toString().padStart(2,"0")  +  " " + current_datetime.getFullYear() +  " " + hours + ":" + current_datetime.getMinutes().toString().padStart(2,"0")  + ":" + current_datetime.getSeconds().toString().padStart(2,"0") + " " + (isAM ? "AM" : "PM") ;
+        return formatted_date;
+    }
+    function force_refresh(){
+        url = document.getElementById("refresh_url").innerText;
+        if (url.includes("task")){
+            var answer = window.confirm("Are you sure you want to force " + url + " to refresh?")
+            if (answer) {
+                runProcess(url, true);
+            }
+        } else {
+            alert("Can't force file upload")
+        }
+    }
+    function runProcess(url, force = false){
+        // Makes ajax call to our api, then displays response in html 
+        // $("#task_files_table:not(:first)").remove();
+        console.log("URL: " + url + " Force: " + force)
+        // var mytbl = document.getElementById("task_files_table");
+        // mytbl.getElementsByTagName("tbody")[0].innerHTML = mytbl.rows[0].innerHTML;
+        $("#refresh_url").text(url)
+        var x = document.getElementById("task_results");
+        x.style.display = "none"
+        var y = document.getElementById("enable_force");
+        y.style.display = "none"
+        if(url == 'undefined'){
+            alert("Url to call was undefined. This shouldn't happen")
+        } else{
+            url = force? url + "?force=True" : url
+             $.getJSON({
+                url: url,
+                success: function (data) {
+                    x.style.display = "block"
+                    $("#task_state").html(data.state)
+                    $("#task_status").html(data.status)
+                    $("#task_runnable").html(data.runnable.toString())
+                    $("#task_forcible").html(data.forcible.toString())
+                    if(data.forcible)
+                        y.style.display = "block"
+                    // file_dictionary =  JSON.parse(data.files)
+                    // for (var key in file_dictionary){
+                    //     var value = file_dictionary[key];
+                    //      var $tr = $('<tr>').append(
+                    //     $('<td>').html("<a href='/files/" + value.file_name + "'>" +  value.file_name + "</a>"),
+                    //     $('<td>').text(value.file_date),
+                    //     $("<td style='text-align: right;'>").text(value.file_size > 0 ? readableBytes(value.file_size) : "--"),
+                    //     $("<td style='text-align: center;'>").text(value.needs_refreshed ? "No" : "Yes")
+                    //     ).appendTo('#task_files_table');
+                    // }
+                }
+            });
+        }
+    }
+    function setFileName(){
+        fullPath = document.getElementById('file_input').value;
+        if (fullPath) {
+            var startIndex = (fullPath.indexOf('\\') >= 0 ? fullPath.lastIndexOf('\\') : fullPath.lastIndexOf('/'));
+            var filename = fullPath.substring(startIndex);
+            if (filename.indexOf('\\') === 0 || filename.indexOf('/') === 0) {
+                filename = filename.substring(1);
+            }
+        }
+        $("#selected_file").html(filename)
+
+    }
+    function postFile(){
+        var x = document.getElementById("task_results");
+        x.style.display = "none"
+        var fileInput = document.getElementById("file_input");
+        var file = fileInput.files[0];
+        var formData = new FormData();
+        formData.append('file', file);
+        fullPath = document.getElementById('file_input').value;
+        if (fullPath) {
+            var startIndex = (fullPath.indexOf('\\') >= 0 ? fullPath.lastIndexOf('\\') : fullPath.lastIndexOf('/'));
+            var filename = fullPath.substring(startIndex);
+            if (filename.indexOf('\\') === 0 || filename.indexOf('/') === 0) {
+                filename = filename.substring(1);
+            }
+        }
+        console.log("Attempting to upload: " + filename)
+        $.ajax({
+            type        : 'POST', // define the type of HTTP verb we want to use (POST for our form)
+            url         : '/files/' + filename, // the url where we want to POST
+            data        : formData, // our data object -> file 
+            processData : false,
+            contentType : false,
+            success     : function (data) {
+                    x.style.display = "block"
+                    console.log(data)
+                    $("#task_state").html(data.state)
+                    $("#task_status").html(data.status + " Upload File: " + filename)
+                    document.getElementById('upload_form').style.display='none'
+                }
+        })
+    }
+    function readableBytes(bytes) {
+        var i = Math.floor(Math.log(bytes) / Math.log(1024)),
+        sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+
+        return (bytes / Math.pow(1024, i)).toFixed(2) * 1 + ' ' + sizes[i];
+    }
+ 
+    
+</script>
+
+ </body>
+ </html

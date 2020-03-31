@@ -1,0 +1,25 @@
+Requirements:
+
+1.	Secure S3 bucket in same region as ec2 instance. Two sub-folders should be created there: data and code
+2.	Host with git
+3.	Admin level access to an AWS account
+
+Steps:
+1.	Git clone the repo and branch (https://github.nike.com/CIS/winning-team-gitops/tree/topic/flaskstuff)
+2.	Create or post server TLS/SSL server certs as server_cert.pem and server_key.pem in the ./servercerts sub-folder
+a.	Option 1: Generate self signed (use chmod +x generate_self_signed.sh && ./generate_self_signed.sh)
+b.	Option 2: Get from venafi
+3.	Zip up all files and folders (excluding *.log and us-west-2.ec2.run-flask-v1.yaml) to a file named “mlai.zip”
+a.	Note: Do not zip root folder, rather, the files and sub folders
+4.	Post the zip file to the s3 bucket /code folder
+5.	Login to destination AWS account, go to cloud formation, and create a new stack using us-west-2.ec2.run-flask-v1.yaml
+
+Notes, 
+1.	Once the CF script completes, the server has about 5 minutes of work to process.  
+2.	The CF script in the output tab will list items it created as well as provide a cut and paste text string for SSH to new host.
+3.	To monitor progress of server build activity, ssh to the host, and then issue tail -f /var/log/user-data.log.  This will show retime the execution.
+4.	Once all server setup steps are completed, the host will reboot
+5.	The CF script outputs the url (in output tab) to the host
+6.	Web requests / crashes, etc are recorded in /processor/mlai/app.log.  You can ssh to host and run tail -f /processor/mlai/app.log to monitor it
+7.	The CF script generates the /processor/mlai/.env file that configures things like data path, etc.  Check that if issues arise
+

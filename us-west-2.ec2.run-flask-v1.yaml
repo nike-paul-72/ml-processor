@@ -1,0 +1,283 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Creates a user selectable EC2 instance, loads the cy ops challenge code base, and launches it a a web site
+Parameters:
+    VpcId:
+      Description: "Your target VPC ID"
+      Type: "AWS::EC2::VPC::Id"
+      Default: "vpc-0ada2a44aa5bf51bf"
+    SubnetId:
+      Description: "Target subnet ID"
+      Type: "AWS::EC2::Subnet::Id"
+      Default: "subnet-0d8b8b7f12103b76c"
+    KeyName:
+      Description: "Instance key name"
+      Type: "AWS::EC2::KeyPair::KeyName"      
+    InstanceType:
+      Description: "Amazon EC2 instance type"
+      Type: "String"
+      Default: "t2.small"
+      AllowedValues: [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge", "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge", "c1.medium", "c1.xlarge", "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge", "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge", "g2.2xlarge", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge", "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge", "d2.xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge", "hi1.4xlarge", "hs1.8xlarge", "cr1.8xlarge", "cc2.8xlarge", "cg1.4xlarge" ]
+    HostName:
+      Description: "Enter the Name for the server (as displayed in AWS EC2 console)"
+      Type: "String"
+      Default: "cis-ops-challenge-mlai"
+    S3Bucket:
+      Description: "Enter S3 Bucket Name to Use"
+      Type: "String"
+      Default: "cis-ops-challenge" 
+    S3ROLENAME:
+      Description: "Enter EC2 role name with S3 write permission"
+      Type: "String"
+      Default: "full_S3_access_from_EC2" 
+    AMIID:
+      Description: "Please enter the AMI ID for a Ubutu 16.04 hardened image valid in your target region"
+      Type: "String"
+      Default:  "ami-0719529d4481721a2" 
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "VPC Level Configuration"
+        Parameters:
+          - VpcId
+          - SubnetId
+      -
+        Label:
+          default: "Instance Configuraton"
+        Parameters:
+          - HostName
+          - InstanceType
+          - KeyName
+          - AMIID
+      -
+        Label:
+          default: "S3 Bucket Configuration"
+        Parameters:
+          - S3Bucket
+          - S3ROLENAME
+    ParameterLabels:
+      VpcId:
+        default: "VPC Name"
+      SubnetId:
+        default: "Subnet"
+      HostName:
+        default: "Hostname"
+      InstanceType:
+        default: "Instance Type"
+      KeyName:
+        default: "Instance (SSH) Key"
+      AMIID:
+        default: "AMI ID"
+      S3Bucket:
+        default: "S3 Bucket Name"
+      S3ROLENAME:
+        default: "S3 Role Name (EC2 to S3 Role)"
+Resources:
+  NetSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Standard Ports and Protocols
+        VpcId: !Ref VpcId
+        SecurityGroupIngress:
+        - CidrIp: 10.0.0.0/8
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        - CidrIp: 10.0.0.0/8
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+        - CidrIp: 10.0.0.0/8
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: 10.0.0.0/8
+          IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1  
+        SecurityGroupEgress: 
+        - CidrIp: 0.0.0.0/0     
+          IpProtocol: -1
+          FromPort: -1
+          ToPort: -1      
+  UbuntuEC2Profile: # Used to attach role to EC2 isntance
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles: [!Ref S3ROLENAME] 
+  UbuntuEC2Instance: #An inline comment
+    Type: "AWS::EC2::Instance"
+    Properties: 
+      ImageId: !Ref AMIID
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref UbuntuEC2Profile
+      KeyName: !Ref KeyName
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs: 
+            VolumeSize: 50
+      NetworkInterfaces: 
+          - DeviceIndex: "0"
+            AssociatePublicIpAddress: true
+            SubnetId: !Ref SubnetId
+            GroupSet:
+              - !Ref NetSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Ref HostName       # Add more Tags using the same structure 
+        - Key: nike-application
+          Value: stm-contextualizer-server       # Add more Tags using the same structure 
+        - Key: nike-department
+          Value: cis stm      # Add more Tags using the same structure 
+        - Key: nike-environment
+          Value: test      # Add more Tags using the same structure 
+        - Key: nike-requestor 
+          Value: information security     # Add more Tags using the same structure 
+      UserData:
+        Fn::Base64: 
+          !Sub |
+          #!/bin/bash -xe
+          # Output console data to a log file for seeing.  use tail -f /var/log/user-data.log to see cf execution in realtime
+          exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+          #Update environment while preventing interactive popups in apt.
+          echo "[+] Updating host OS"
+          ucf --purge /boot/grub/menu.lst
+          UCF_FORCE_CONFFNEW=YES DEBIAN_FRONTEND=noninteractive apt update
+          UCF_FORCE_CONFFNEW=YES DEBIAN_FRONTEND=noninteractive apt upgrade -yqf
+          apt autoremove
+          apt autoclean
+          sed -i -i "s|$HOSTNAME|${HostName}|g" /etc/hostname
+          sed -i -i "s|localhost|${HostName}|g" /etc/hosts
+ 
+          # Remove existing fuse if installed
+          echo "[+] Prepping for S3FS mount"
+          UCF_FORCE_CONFFNEW=YES DEBIAN_FRONTEND=noninteractive apt install build-essential mime-support automake autotools-dev fuse g++ git libfuse-dev libssl-dev libxml2-dev make pkg-config s3fs unzip libgcrypt20 libgcrypt20-dev -yqf
+          mkdir -p /tmp/cache
+          export bucket_name="${S3Bucket}"
+          export bucket_role="${S3ROLENAME}"
+          echo ${S3Bucket} ${S3ROLENAME}>> /home/ubuntu/config.txt
+
+          # Install crowdstrike to image
+          wget -O /tmp/falcon-sensor-amd64.deb https://cis-crowdstrike-linux-repo.s3-us-west-2.amazonaws.com/Ubuntu+14_16_18/falcon-sensor-amd64.deb
+          sudo dpkg -i /tmp/falcon-sensor-amd64.deb
+          sudo apt -f install 
+          sudo dpkg -i /tmp/falcon-sensor-amd64.deb
+          sudo /opt/CrowdStrike/falconctl -s --cid=9E32CC1EA0354B46B179993A7DEA5472-B6
+          sudo systemctl start falcon-sensor
+          sudo systemctl status falcon-sensor
+
+          # Install and configure out updates
+          sudo apt install unattended-upgrades
+          sed -i 's/\/\/  \"${distro_id}:${distro_codename}-updates\";/\"${distro_id}:${distro_codename}-updates\"/g' /etc/apt/apt.conf.d/50unattended-upgrades
+          sed -i 's/\/\/  Unattended-Upgrade::Remove-Unused-Dependencies \"false\";Unattended-Upgrade::Remove-Unused-Dependencies \"true\"/g' /etc/apt/apt.conf.d/50unattended-upgrades
+          sed -i 's/\/\/  Unattended-Upgrade::Automatic-Reboot  \"false\";Unattended-Upgrade::Automatic-Reboot \"true\"/g' /etc/apt/apt.conf.d/50unattended-upgrades
+          sed -i 's/\/\/  Unattended-Upgrade::Automatic-Reboot-Time  \"2:00\";Unattended-Upgrade::Automatic-Reboot-Time \"2:00\"/g' /etc/apt/apt.conf.d/50unattended-upgrades
+          # TBD -> Update values in 
+
+          # Set up necessary directories to use as mount point.  To do, investigate tightening down ACLs 771 out to be viable
+          mkdir /data
+          chmod 777 /data
+          chown ubuntu:ubuntu /data
+          mkdir /data/s3
+          chmod 777 /data/s3
+          chown ubuntu:ubuntu /data/s3
+          mkdir /data/s3/$bucket_name
+          chmod 777 /data/s3/$bucket_name
+          chown ubuntu:ubuntu /data/s3/$bucket_name
+ 
+          # Setup mount point for S3FS to ensure remount on reboot
+          echo "[+] Setting up the S3FS Service" 
+          export uid=$(id -u ubuntu)   
+          export gid=$(id -g ubuntu)   
+          echo "$bucket_name /data/s3/$bucket_name fuse.s3fs _netdev,allow_other,umask=777,uid=$uid,gid=$gid,use_cache=/tmp/cache,iam_role="$bucket_role" 0 0" | sudo tee -a /etc/fstab
+          sudo mount -a
+
+          # Install python3
+          UCF_FORCE_CONFFNEW=YES DEBIAN_FRONTEND=noninteractive apt install python3 python3-pip -yqf
+
+          # Get the code and extract onto the server
+          echo "[+] Getting our source code"
+          mkdir /processor
+          chmod 777 /processor
+          chown ubuntu:ubuntu /processor
+          mkdir -p /processor/mlai
+          chmod 777 /processor/mlai
+          chown ubuntu:ubuntu /processor/mlai   
+          sudo cp /data/s3/$bucket_name/code/mlai.zip /processor/mlai/
+          chmod +r /processor/mlai/mlai.zip
+          unzip -o /processor/mlai/mlai.zip -d /processor/mlai/
+          chown -R ubuntu:ubuntu /processor/mlai/*
+          rm  /processor/mlai/mlai.zip
+          python3 -m pip uninstall pip
+          UCF_FORCE_CONFFNEW=YES DEBIAN_FRONTEND=noninteractive apt install python3-pip python-flask python-twisted-core --reinstall -yqf
+          export PYTHONPATH=/usr/local/lib/python3.5/dist-packages
+          pip3 install --upgrade pip
+          sudo -H pip3 install -r /processor/mlai/requirements.txt 
+
+          # Path to data used by host is read from .env now
+          echo "data_path = /data/s3/$bucket_name/data" >> /processor/mlai/.env
+          echo "host_in_twisted = True" >> /processor/mlai/.env
+          echo "builtin_port = 5000" >> /processor/mlai/.env
+          echo "twisted_port = 8080" >> /processor/mlai/.env
+          echo "twisted_ip = 127.0.0.1" >> /processor/mlai/.env
+
+          # Optional future work
+          # Inject into hosts records for nifi-vm.nike.com -> internal-a1bbbf4541af911ea80200200d13168f-506681575.us-west-2.elb.amazonaws.com and panorama-va.nike.com -> 10.128.148.128
+          # Or set dns resolver to NIKE resolver at 10.9.8.7 / 10.9.8.8
+          
+          mv /etc/resolv.conf /etc/resolv.conf.old
+          echo "nameserver 10.9.8.7" | sudo tee -a /etc/resolv.conf
+          echo "nameserver 10.9.8.8" | sudo tee -a /etc/resolv.conf
+          
+          # Will then be able to call VM data loaders.  Write to S3 if needed
+
+          
+          # Run the processor
+          # python3 /processor/code/ec2ThreadedMapper.py 
+
+          # Setup the service to run as twisted via systemd
+          cp /processor/mlai/systemd/cis-ops-challenge-http.service.app /etc/systemd/system/cis-ops-challenge-http.service
+          chmod 755 /etc/systemd/system/cis-ops-challenge-http.service
+          systemctl daemon-reload
+          systemctl enable cis-ops-challenge-http
+          systemctl start cis-ops-challenge-http
+          systemctl status cis-ops-challenge-http
+          echo "[+] Starting twisted http server http://127.0.01:8080"
+
+          # Setup nginx to run and act as forward proxy for requests
+          UCF_FORCE_CONFFNEW=YES DEBIAN_FRONTEND=noninteractive apt install nginx -yqf
+          systemctl stop nginx 
+          cp /processor/mlai/nginx/nginx.conf /etc/nginx/
+          mkdir -p /var/log/nginx
+          ufw allow 'Nginx Full'
+          systemctl start nginx 
+          echo "[+] Starting nginx https server https://0.0.0.0 port 443 proxies to twisted on port 8080"
+          echo "[+] Starting nginx httpsserver http://0.0.0.0 port 80 -> Redirects to https"
+          export IP=$(curl ifconfig.me)
+          echo "[+] If public access is permitted, server is accessible at https://$IP "
+          reboot
+Outputs:
+  VpcId:
+    Description: The VPC where the resources were created
+    Value: !Ref VpcId
+
+  SubnetId:
+    Description: The subnet where the resource was created
+    Value: !Ref SubnetId
+
+  NetSecurityGroup:
+    Description: The security group that was created
+    Value: !Ref NetSecurityGroup
+
+  HostPrivateIP:
+    Description: The private IP of the host (for web and ssh access)
+    Value: !GetAtt UbuntuEC2Instance.PrivateIp
+
+  SSHConnect:
+    Description: Command to connect via ssh
+    Value: !Sub "ssh -i \"${KeyName}\" ubuntu@${UbuntuEC2Instance.PrivateIp}"
+
+  HTTPSConnect:
+    Description: Command to connect via ssh
+    Value: !Sub "https://${UbuntuEC2Instance.PrivateIp}"
